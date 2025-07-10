@@ -1,0 +1,52 @@
+{
+  "name": "mcp-server-proxmox",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for Proxmox Virtual Environment - manage VMs, containers, nodes, and resources through AI assistants",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "proxmox",
+    "virtualization",
+    "vm-management",
+    "container-management",
+    "ai-assistant"
+  ],
+  "author": "heybearc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heybearc/mcp-server-proxmox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/heybearc/mcp-server-proxmox/issues"
+  },
+  "homepage": "https://github.com/heybearc/mcp-server-proxmox#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "axios": "^1.7.0",
+    "https": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

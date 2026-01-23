@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -9,11 +10,13 @@ import {
   McpError,
   CallToolRequest,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ProxmoxClient } from './proxmox-client';
+import { ProxmoxClient } from './proxmox-client.js';
+import { WMACSGuardian } from './wmacs-guardian.js';
 
 class ProxmoxMCPServer {
   private server: Server;
   private proxmoxClient: ProxmoxClient;
+  private guardian: WMACSGuardian;
 
   constructor() {
     this.server = new Server(
@@ -29,6 +32,7 @@ class ProxmoxMCPServer {
     );
 
     this.proxmoxClient = new ProxmoxClient();
+    this.guardian = new WMACSGuardian();
     this.setupToolHandlers();
   }
 
@@ -138,6 +142,78 @@ class ProxmoxMCPServer {
               required: ['node'],
             },
           },
+          {
+            name: 'guarded_execute',
+            description: 'Execute commands with automatic deadlock detection and recovery using WMACS Guardian',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                command: {
+                  type: 'string',
+                  description: 'Command to execute with guardian protection',
+                },
+                maxRetries: {
+                  type: 'number',
+                  description: 'Maximum retry attempts (default: 3)',
+                },
+                timeoutMs: {
+                  type: 'number',
+                  description: 'Timeout in milliseconds (default: 30000)',
+                },
+              },
+              required: ['command'],
+            },
+          },
+          {
+            name: 'start_application',
+            description: 'Start application on container with guardian protection',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                container: {
+                  type: 'string',
+                  description: 'Container ID (e.g., "134")',
+                },
+                port: {
+                  type: 'number',
+                  description: 'Port number (default: 3001)',
+                },
+              },
+              required: ['container'],
+            },
+          },
+          {
+            name: 'ssh_execute',
+            description: 'Execute SSH command with guardian protection',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                host: {
+                  type: 'string',
+                  description: 'Host IP address',
+                },
+                command: {
+                  type: 'string',
+                  description: 'Command to execute via SSH',
+                },
+              },
+              required: ['host', 'command'],
+            },
+          },
+          {
+            name: 'restart_container',
+            description: 'Restart Proxmox container with guardian protection',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                containerId: {
+                  type: 'string',
+                  description: 'Container ID to restart',
+                },
+              },
+              required: ['containerId'],
+            },
+          },
         ],
       };
     });
@@ -168,6 +244,28 @@ class ProxmoxMCPServer {
           
           case 'get_node_status':
             return await this.handleGetNodeStatus(typedArgs?.node as string);
+          
+          case 'guarded_execute':
+            return await this.handleGuardedExecute(
+              typedArgs?.command as string,
+              typedArgs?.maxRetries as number,
+              typedArgs?.timeoutMs as number
+            );
+          
+          case 'start_application':
+            return await this.handleStartApplication(
+              typedArgs?.container as string,
+              typedArgs?.port as number
+            );
+          
+          case 'ssh_execute':
+            return await this.handleSSHExecute(
+              typedArgs?.host as string,
+              typedArgs?.command as string
+            );
+          
+          case 'restart_container':
+            return await this.handleRestartContainer(typedArgs?.containerId as string);
           
           default:
             throw new McpError(
@@ -275,6 +373,74 @@ class ProxmoxMCPServer {
         {
           type: 'text',
           text: JSON.stringify(status, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleGuardedExecute(command: string, maxRetries?: number, timeoutMs?: number) {
+    if (!command) {
+      throw new Error('Command is required');
+    }
+    
+    const options: any = {};
+    if (maxRetries !== undefined) options.maxRetries = maxRetries;
+    if (timeoutMs !== undefined) options.timeoutMs = timeoutMs;
+    
+    const result = await this.guardian.guardedExecute(command, options);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Command executed successfully:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+
+  private async handleStartApplication(container: string, port?: number) {
+    if (!container) {
+      throw new Error('Container ID is required');
+    }
+    
+    const result = await this.guardian.startApplication(container, port);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Application started successfully on container ${container}`,
+        },
+      ],
+    };
+  }
+
+  private async handleSSHExecute(host: string, command: string) {
+    if (!host || !command) {
+      throw new Error('Host and command are required');
+    }
+    
+    const result = await this.guardian.executeSSH(host, command);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `SSH command executed successfully:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+
+  private async handleRestartContainer(containerId: string) {
+    if (!containerId) {
+      throw new Error('Container ID is required');
+    }
+    
+    const result = await this.guardian.restartContainer(containerId);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Container ${containerId} restarted successfully`,
         },
       ],
     };

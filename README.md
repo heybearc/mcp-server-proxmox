@@ -8,12 +8,26 @@ A **Model Context Protocol (MCP) server** for **Proxmox Virtual Environment** th
 
 ## 🚀 Features
 
+### Core Proxmox Management
 - **Node Management**: List and monitor Proxmox cluster nodes
 - **VM Operations**: Start, stop, and monitor virtual machines
 - **Container Management**: Manage LXC containers
 - **Status Monitoring**: Real-time status information for nodes, VMs, and containers
+
+### 🆕 Full Container Provisioning (v0.2.0)
+- **Automated Provisioning**: Create containers with full infrastructure automation
+- **Netbox IPAM Integration**: Automatic IP and VM registration
+- **NPM Reverse Proxy**: Automatic proxy host creation with SSL
+- **DNS Registration**: Automatic AdGuard Home DNS entries
+- **Monitoring Setup**: Automatic node_exporter and promtail installation
+- **Backup Configuration**: Automatic Proxmox backup scheduling
+- **Template Stacks**: Pre-configured templates (media, dev, monitoring)
+- **CTID Auto-Assignment**: Intelligent CTID assignment by function
+
+### Infrastructure
 - **Secure Authentication**: Support for both password and API token authentication
 - **Multi-Node Support**: Works with single nodes or full Proxmox clusters
+- **Natural Language**: Deploy infrastructure by talking to AI
 
 ## 📋 Prerequisites
 
@@ -91,6 +105,7 @@ Refer to your MCP client's documentation for server configuration.
 
 ## 🔧 Available Tools
 
+### Basic Operations
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `list_nodes` | List all Proxmox nodes | None |
@@ -101,16 +116,37 @@ Refer to your MCP client's documentation for server configuration.
 | `stop_vm` | Stop a virtual machine | `node`, `vmid` |
 | `get_node_status` | Get node status details | `node` |
 
+### 🆕 Provisioning Tools (v0.2.0)
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `create_container` | Create and fully provision a new LXC container | `name`, `function`, `ip`, `memory`, `cores`, `disk`, `domain`, `port`, `ssl` |
+| `provision_stack` | Deploy pre-configured container stack | `stackType`, `name`, `ip`, `domain` |
+| `get_available_ctid` | Get next available CTID in function range | `function` |
+
 ## 💡 Usage Examples
 
 ### With AI Assistant
 
+**Basic Operations:**
 ```
 "Show me all VMs on my Proxmox cluster"
 "Start VM 100 on node pve1"
 "What's the status of my Proxmox nodes?"
 "List all containers on node pve2"
 ```
+
+**🆕 Provisioning (v0.2.0):**
+```
+"Create a new media server container with 4GB RAM at 10.92.3.15"
+"Deploy a Scrypted NVR container with domain scrypted.cloudigan.net"
+"Provision a development environment at 10.92.3.50"
+"What's the next available CTID for utility containers?"
+```
+
+**Natural Language Examples:**
+- "I need a new container for Plex with 8GB RAM and SSL enabled"
+- "Create a monitoring stack at 10.92.3.60 with Grafana access"
+- "Deploy a dev environment with 2 cores and 32GB disk"
 
 ### Direct API Usage
 

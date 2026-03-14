@@ -12,17 +12,19 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ProxmoxClient } from './proxmox-client.js';
 import { WMACSGuardian } from './wmacs-guardian.js';
+import { ProvisioningManager } from './provisioning-manager.js';
 
 class ProxmoxMCPServer {
   private server: Server;
   private proxmoxClient: ProxmoxClient;
   private guardian: WMACSGuardian;
+  private provisioningManager: ProvisioningManager;
 
   constructor() {
     this.server = new Server(
       {
         name: 'mcp-server-proxmox',
-        version: '0.1.0',
+        version: '0.2.0',
       },
       {
         capabilities: {
@@ -33,6 +35,7 @@ class ProxmoxMCPServer {
 
     this.proxmoxClient = new ProxmoxClient();
     this.guardian = new WMACSGuardian();
+    this.provisioningManager = new ProvisioningManager();
     this.setupToolHandlers();
   }
 
@@ -214,6 +217,99 @@ class ProxmoxMCPServer {
               required: ['containerId'],
             },
           },
+          {
+            name: 'create_container',
+            description: 'Create and provision a new LXC container with full automation (Netbox, NPM, DNS, monitoring, backups)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  description: 'Container hostname (lowercase, hyphens only, e.g., "scrypted-nvr")',
+                },
+                function: {
+                  type: 'string',
+                  enum: ['bot', 'dev', 'media', 'core', 'network', 'monitoring', 'storage', 'security', 'utility'],
+                  description: 'Container function category (determines CTID range)',
+                },
+                ip: {
+                  type: 'string',
+                  description: 'IP address (e.g., "10.92.3.15")',
+                },
+                memory: {
+                  type: 'number',
+                  description: 'RAM in MB (default: 2048)',
+                },
+                cores: {
+                  type: 'number',
+                  description: 'CPU cores (default: 2)',
+                },
+                disk: {
+                  type: 'number',
+                  description: 'Disk size in GB (default: 32)',
+                },
+                privileged: {
+                  type: 'boolean',
+                  description: 'Create privileged container (default: false)',
+                },
+                domain: {
+                  type: 'string',
+                  description: 'Domain for NPM reverse proxy (e.g., "scrypted.cloudigan.net")',
+                },
+                port: {
+                  type: 'number',
+                  description: 'Backend port for NPM proxy (default: 80)',
+                },
+                ssl: {
+                  type: 'boolean',
+                  description: 'Enable SSL for NPM proxy (default: false)',
+                },
+              },
+              required: ['name', 'function', 'ip'],
+            },
+          },
+          {
+            name: 'provision_stack',
+            description: 'Provision a pre-configured container stack (template) with common settings',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                stackType: {
+                  type: 'string',
+                  enum: ['media', 'dev', 'monitoring', 'custom'],
+                  description: 'Type of stack to provision',
+                },
+                name: {
+                  type: 'string',
+                  description: 'Container hostname',
+                },
+                ip: {
+                  type: 'string',
+                  description: 'IP address',
+                },
+                domain: {
+                  type: 'string',
+                  description: 'Optional domain for web access',
+                },
+              },
+              required: ['stackType', 'name', 'ip'],
+            },
+          },
+          {
+            name: 'get_available_ctid',
+            description: 'Get next available CTID in a specific function range',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                function: {
+                  type: 'string',
+                  enum: ['bot', 'dev', 'media', 'core', 'network', 'monitoring', 'storage', 'security', 'utility'],
+                  description: 'Container function category',
+                },
+              },
+              required: ['function'],
+            },
+          },
         ],
       };
     });
@@ -266,6 +362,20 @@ class ProxmoxMCPServer {
           
           case 'restart_container':
             return await this.handleRestartContainer(typedArgs?.containerId as string);
+          
+          case 'create_container':
+            return await this.handleCreateContainer(typedArgs as any);
+          
+          case 'provision_stack':
+            return await this.handleProvisionStack(
+              typedArgs?.stackType as string,
+              typedArgs?.name as string,
+              typedArgs?.ip as string,
+              typedArgs?.domain as string | undefined
+            );
+          
+          case 'get_available_ctid':
+            return await this.handleGetAvailableCtid(typedArgs?.function as string);
           
           default:
             throw new McpError(
@@ -441,6 +551,111 @@ class ProxmoxMCPServer {
         {
           type: 'text',
           text: `Container ${containerId} restarted successfully`,
+        },
+      ],
+    };
+  }
+
+  private async handleCreateContainer(args: any) {
+    const spec = {
+      name: args.name,
+      function: args.function,
+      ip: args.ip,
+      memory: args.memory,
+      cores: args.cores,
+      disk: args.disk,
+      privileged: args.privileged,
+      domain: args.domain,
+      port: args.port,
+      ssl: args.ssl,
+    };
+
+    // Validate spec
+    const validation = this.provisioningManager.validateSpec(spec);
+    if (!validation.valid) {
+      throw new Error(`Invalid container specification:\n${validation.errors.join('\n')}`);
+    }
+
+    // Provision container
+    const result = await this.provisioningManager.provisionContainer(spec);
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ Container provisioned successfully!\n\n` +
+                `**Container:** ${result.name} (CT${result.ctid})\n` +
+                `**IP Address:** ${result.ip}\n` +
+                `${result.domain ? `**Domain:** ${result.domain}\n` : ''}` +
+                `\n**Automation Complete:**\n` +
+                `- Proxmox LXC created\n` +
+                `- Netbox IPAM registered\n` +
+                `${result.domain ? '- NPM proxy configured\n' : ''}` +
+                `${result.domain ? '- DNS record added\n' : ''}` +
+                `- Monitoring agents installed\n` +
+                `- Backup schedule configured\n` +
+                `\n**Next Steps:**\n` +
+                `1. SSH to container: ssh root@${result.ip}\n` +
+                `2. Install application software\n` +
+                `3. Configure services\n` +
+                `${result.deploymentRecord ? `\nDeployment record: ${result.deploymentRecord}` : ''}`,
+        },
+      ],
+    };
+  }
+
+  private async handleProvisionStack(
+    stackType: string,
+    name: string,
+    ip: string,
+    domain?: string
+  ) {
+    if (!stackType || !name || !ip) {
+      throw new Error('Stack type, name, and IP are required');
+    }
+
+    const options = domain ? { domain } : undefined;
+    const result = await this.provisioningManager.provisionStack(
+      stackType as any,
+      name,
+      ip,
+      options
+    );
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ ${stackType.toUpperCase()} stack provisioned successfully!\n\n` +
+                `**Container:** ${result.name} (CT${result.ctid})\n` +
+                `**IP Address:** ${result.ip}\n` +
+                `${result.domain ? `**Domain:** ${result.domain}\n` : ''}` +
+                `\nFully automated deployment complete with monitoring and backups configured.`,
+        },
+      ],
+    };
+  }
+
+  private async handleGetAvailableCtid(functionType: string) {
+    if (!functionType) {
+      throw new Error('Function type is required');
+    }
+
+    const ctid = await this.provisioningManager.getAvailableCtid(functionType as any);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Next available CTID for ${functionType}: ${ctid}`,
         },
       ],
     };

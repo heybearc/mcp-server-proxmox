@@ -115,6 +115,7 @@ SKIP_DNS="false"
 SKIP_MONITORING="false"
 SKIP_BACKUP="false"
 DRY_RUN="false"
+AUTO_YES="false"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -184,6 +185,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dry-run)
             DRY_RUN="true"
+            shift
+            ;;
+        --yes|-y)
+            AUTO_YES="true"
             shift
             ;;
         -h|--help)
@@ -304,11 +309,15 @@ if [[ "$DRY_RUN" = "true" ]]; then
     exit 0
 fi
 
-read -p "Proceed with deployment? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    print_warning "Deployment cancelled"
-    exit 0
+if [[ "$AUTO_YES" = "false" ]]; then
+    read -p "Proceed with deployment? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_warning "Deployment cancelled"
+        exit 0
+    fi
+else
+    print_status "Auto-confirming deployment (--yes flag)"
 fi
 
 # Step 1: Create Proxmox LXC container

@@ -55,6 +55,7 @@ export class ProvisioningManager {
       `--name ${spec.name}`,
       `--function ${spec.function}`,
       `--ip ${spec.ip}`,
+      '--yes',
     ];
 
     if (spec.ctid) args.push(`--ctid ${spec.ctid}`);

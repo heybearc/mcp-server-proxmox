@@ -137,4 +137,10 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-.windsurf/workflows/*.md
+.windsurf/workflows/*
+.windsurf/rules/*
+.windsurf/skills/*
+.cursor/commands/*
+.cursor/rules/*
+.cursor/skills/*
+.cursor/mcp.json
